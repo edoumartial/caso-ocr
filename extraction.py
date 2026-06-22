@@ -2,6 +2,7 @@ import re
 import easyocr
 import numpy as np
 from pdf2image import convert_from_path
+import json # Ajoutez cet import
 
 # Initialisation du lecteur
 reader = easyocr.Reader(['fr', 'en'], gpu=False)
@@ -52,5 +53,8 @@ def affiner_extraction(file_path):
         match = re.search(motif, texte_propre, re.IGNORECASE)
         if match:
             data[cle] = match.group(1).strip()
+    data["extraction_ocr"] = texte_propre
+    data["ocr_raw_json"] = json.dumps(data)
+    
 
     return data

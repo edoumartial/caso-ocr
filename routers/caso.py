@@ -43,6 +43,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
     return {"access_token": create_access_token(data={"sub": form_data.username}), "token_type": "bearer"}
 
 # --- UPLOAD MULTIPLE ---
+# --- UPLOAD MULTIPLE (Corrigé) ---
 @router.post("/upload-multiple/")
 async def upload_multiple(files: List[UploadFile] = File(...), current_user: str = Depends(get_current_user), db: Session = Depends(get_db)):
     BASE_DIR = Path(__file__).resolve().parent.parent
@@ -60,21 +61,25 @@ async def upload_multiple(files: List[UploadFile] = File(...), current_user: str
         db.commit()
         
         # OCR
-        data = affiner_extraction(str(file_path))
+        extracted_data = affiner_extraction(str(file_path)) # Correction : appelez la fonction une seule fois
         
         # Insertion dans caso_data
+        # Dans caso.py, dans la fonction upload_multiple
+        # ... dans upload_multiple
         db.execute(text("""
-            INSERT INTO caso_data (document_id, num_caso, parcelle, section, commune, requerant, date_debut, date_fin, statut)
-            VALUES (:did, :nc, :p, :s, :c, :r, :dd, :df, 'en_attente')
+            INSERT INTO caso_data (document_id, num_caso, parcelle, section, commune, 
+                                requerant, date_debut, date_fin, extraction_ocr)
+            VALUES (:did, :nc, :p, :s, :c, :r, :dd, :df, :raw)
         """), {
             "did": doc_id,
-            "nc": data.get("num_caso"),
-            "p": data.get("parcelle"),
-            "s": data.get("section"),
-            "c": data.get("commune"),
-            "r": data.get("requerant"),
-            "dd": data.get("date_debut"),
-            "df": data.get("date_fin")
+            "nc": extracted_data["num_caso"],
+            "p": extracted_data["parcelle"],
+            "s": extracted_data["section"],
+            "c": extracted_data["commune"],
+            "r": extracted_data["requerant"],
+            "dd": extracted_data["date_debut"],
+            "df": extracted_data["date_fin"],
+            "raw": extracted_data["extraction_ocr"] # <--- ICI : on utilise la nouvelle clé
         })
         db.commit()
     return {"message": "Upload et OCR terminés"}
@@ -82,15 +87,14 @@ async def upload_multiple(files: List[UploadFile] = File(...), current_user: str
 # --- GET TOUS DOCUMENTS ---
 @router.get("/tous-les-documents/")
 async def get_tous_documents(current_user: str = Depends(get_current_user), db: Session = Depends(get_db)):
-    # Modifiez c.id en c.id AS id pour forcer le nom de la clé dans le JSON
     docs = db.execute(text("""
         SELECT c.id AS id, d.filename, c.num_caso, c.parcelle, c.section, c.commune, 
-               c.requerant, c.date_debut, c.date_fin, c.statut, d.created_at 
+               c.requerant, c.date_debut, c.date_fin, c.statut, d.created_at,
+               c.extraction_ocr 
         FROM caso_data c 
         JOIN documents d ON c.document_id = d.id
         ORDER BY d.created_at DESC
     """)).fetchall()
-    
     return [dict(row._mapping) for row in docs]
 
 # --- VALIDER DOCUMENT ---
@@ -104,8 +108,7 @@ async def valider_document(
     requerant: str = Form(...),
     date_debut: str = Form(...),
     date_fin: str = Form(...),
-    validateur: str = Form(...),
-    current_user: str = Depends(get_current_user),
+    extraction_ocr: str = Form(...), # Nouveau paramètre
     db: Session = Depends(get_db)
 ):
     try:
@@ -113,10 +116,30 @@ async def valider_document(
             UPDATE caso_data 
             SET num_caso=:nc, parcelle=:p, section=:s, commune=:c, 
                 requerant=:r, date_debut=:dd, date_fin=:df, 
-                statut='valide', valide_par=:v 
+                extraction_ocr=:raw, 
+                statut='valide'
             WHERE id = :id
-        """), {"nc": num_caso, "p": parcelle, "s": section, "c": commune, "r": requerant, "dd": date_debut, "df": date_fin, "v": validateur, "id": caso_id})
+        """), {
+            "id": caso_id,
+            "nc": num_caso, "p": parcelle, "s": section, "c": commune,
+            "r": requerant, "dd": date_debut, "df": date_fin,
+            "raw": extraction_ocr # Utilisation du texte brut complet
+        })
         db.commit()
-        return {"message": "Validé"}
+        return {"message": "Validation réussie"}
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+
+# Pensez aussi à mettre à jour /tous-les-documents/ pour sélectionner extraction_ocr
+@router.get("/tous-les-documents/")
+async def get_tous_documents(current_user: str = Depends(get_current_user), db: Session = Depends(get_db)):
+    docs = db.execute(text("""
+        SELECT c.id AS id, d.filename, c.num_caso, c.parcelle, c.section, c.commune, 
+               c.requerant, c.date_debut, c.date_fin, c.statut, d.created_at,
+               c.extraction_ocr 
+        FROM caso_data c 
+        JOIN documents d ON c.document_id = d.id
+        ORDER BY d.created_at DESC
+    """)).fetchall()
+    return [dict(row._mapping) for row in docs]

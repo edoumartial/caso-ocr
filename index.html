@@ -130,6 +130,7 @@
             <form id="validationForm" class="space-y-4">
                 <input type="hidden" id="currentCasoId" name="caso_id">
                 <input type="hidden" name="validateur" id="validateurInput">
+                <input type="hidden" name="extraction_ocr" id="extractionOcrInput">
                 <div id="fieldsContainer"></div>
                 <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700">Enregistrer</button>
                 <button type="button" onclick="retourTableau()" class="w-full text-slate-500 py-2 hover:underline">Retour</button>
@@ -237,22 +238,45 @@
         }
 
         function editerDoc(id) {
-            const doc = tousLesDocs.find(d => d.id === id);
-            document.getElementById('vueTableau').classList.add('hidden');
-            document.getElementById('vueEdition').classList.remove('hidden');
-            document.getElementById('pdfViewer').src = `${API_URL}/static/${doc.filename}`;
-            document.getElementById('currentCasoId').value = doc.id;
-            const token = getToken();
-            const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
-            document.getElementById('validateurInput').value = payload.sub;
-            document.getElementById('fieldsContainer').innerHTML = champs.map(col => {
-                if (col === 'num_caso') {
-                    let val = (doc[col] || '').replace(SUFFIXE_CASO, '');
-                    return `<div class="mb-3"><label class="block text-xs font-bold uppercase">N° CASO</label><div class="flex"><input type="text" id="inputNumCaso" value="${val}" class="w-1/3 p-2 border rounded-l"><input type="text" value="${SUFFIXE_CASO}" readonly class="w-2/3 p-2 border bg-slate-100 rounded-r text-slate-500"></div></div>`;
-                }
-                return `<div class="mb-3"><label class="block text-xs font-bold uppercase">${col.replace('_', ' ')}</label><input type="text" name="${col}" value="${doc[col] || ''}" class="w-full p-2 border rounded shadow-sm"></div>`;
-            }).join('');
+    // 1. Recherche du document dans la liste locale
+    const doc = tousLesDocs.find(d => d.id === id);
+    
+    // 2. Basculement de l'affichage entre le tableau et l'éditeur
+    document.getElementById('vueTableau').classList.add('hidden');
+    document.getElementById('vueEdition').classList.remove('hidden');
+    
+    // 3. Chargement du PDF dans l'iframe
+    document.getElementById('pdfViewer').src = `${API_URL}/static/${doc.filename}`;
+    
+    // 4. Mise à jour des identifiants et données cachées
+    document.getElementById('currentCasoId').value = doc.id;
+    
+    // CORRECTION APPLIQUÉE ICI : Utilisation de extraction_ocr
+    document.getElementById('extractionOcrInput').value = doc.extraction_ocr;
+    
+    // 5. Gestion du validateur via le token JWT
+    const token = getToken();
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    document.getElementById('validateurInput').value = payload.sub;
+    
+    // 6. Génération dynamique des champs du formulaire
+    document.getElementById('fieldsContainer').innerHTML = champs.map(col => {
+        if (col === 'num_caso') {
+            let val = (doc[col] || '').replace(SUFFIXE_CASO, '');
+            return `<div class="mb-3">
+                        <label class="block text-xs font-bold uppercase">N° CASO</label>
+                        <div class="flex">
+                            <input type="text" id="inputNumCaso" value="${val}" class="w-1/3 p-2 border rounded-l">
+                            <input type="text" value="${SUFFIXE_CASO}" readonly class="w-2/3 p-2 border bg-slate-100 rounded-r text-slate-500">
+                        </div>
+                    </div>`;
         }
+        return `<div class="mb-3">
+                    <label class="block text-xs font-bold uppercase">${col.replace('_', ' ')}</label>
+                    <input type="text" name="${col}" value="${doc[col] || ''}" class="w-full p-2 border rounded shadow-sm">
+                </div>`;
+    }).join('');
+}
 
         function retourTableau() {
             document.getElementById('vueTableau').classList.remove('hidden');
