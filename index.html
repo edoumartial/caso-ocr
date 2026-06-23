@@ -17,6 +17,7 @@
     <option value="Bongoville">
     <option value="Booué">
     <option value="Boumango">
+    <option value="Cocobeach">
     <option value="Fougamou">
     <option value="Franceville">
     <option value="Gamba">
@@ -41,7 +42,7 @@
     <option value="Mouila">
     <option value="Mounana">
     <option value="Ndjolé">
-    <option value="Ndende">
+    <option value="Ndendé">
     <option value="Ndindi">
     <option value="Ngouoni">
     <option value="Ntoum">
@@ -50,7 +51,8 @@
     <option value="Ovan">
     <option value="Owendo">
     <option value="Oyem">
-    <option value="Port gentil">
+    <option value="Port-Gentil">
+    <option value="Tchibanga">
 </datalist>
 
     <div id="vueTableau" class="p-8">
@@ -261,21 +263,33 @@
     
     // 6. Génération dynamique des champs du formulaire
     document.getElementById('fieldsContainer').innerHTML = champs.map(col => {
-        if (col === 'num_caso') {
-            let val = (doc[col] || '').replace(SUFFIXE_CASO, '');
-            return `<div class="mb-3">
-                        <label class="block text-xs font-bold uppercase">N° CASO</label>
-                        <div class="flex">
-                            <input type="text" id="inputNumCaso" value="${val}" class="w-1/3 p-2 border rounded-l">
-                            <input type="text" value="${SUFFIXE_CASO}" readonly class="w-2/3 p-2 border bg-slate-100 rounded-r text-slate-500">
-                        </div>
-                    </div>`;
-        }
+    
+    // 1. Gestion du N° CASO (déjà existante)
+    if (col === 'num_caso') {
+        let val = (doc[col] || '').replace(SUFFIXE_CASO, '');
         return `<div class="mb-3">
-                    <label class="block text-xs font-bold uppercase">${col.replace('_', ' ')}</label>
-                    <input type="text" name="${col}" value="${doc[col] || ''}" class="w-full p-2 border rounded shadow-sm">
+                    <label class="block text-xs font-bold uppercase">N° CASO</label>
+                    <div class="flex">
+                        <input type="text" id="inputNumCaso" value="${val}" class="w-1/3 p-2 border rounded-l">
+                        <input type="text" value="${SUFFIXE_CASO}" readonly class="w-2/3 p-2 border bg-slate-100 rounded-r text-slate-500">
+                    </div>
                 </div>`;
-    }).join('');
+    }
+
+    // 2. NOUVELLE CONDITION : Gestion de la commune avec datalist
+    if (col === 'commune') {
+        return `<div class="mb-3">
+                    <label class="block text-xs font-bold uppercase">Commune</label>
+                    <input type="text" name="commune" value="${doc.commune || ''}" list="listeCommunes" class="w-full p-2 border rounded shadow-sm" autocomplete="off">
+                </div>`;
+    }
+
+    // 3. Gestion des autres champs (requerant, section, etc.)
+    return `<div class="mb-3">
+                <label class="block text-xs font-bold uppercase">${col.replace('_', ' ')}</label>
+                <input type="text" name="${col}" value="${doc[col] || ''}" class="w-full p-2 border rounded shadow-sm">
+            </div>`;
+}).join('');
 }
 
         function retourTableau() {
